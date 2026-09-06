@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lyrics kiểu Spotify</title>
+
+<style>
+*{box-sizing:border-box}
+
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+}
+
+body{
+    overflow:hidden;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#fff;
+    background:
+        radial-gradient(circle at 50% 10%,#302a63 0%,transparent 38%),
+        linear-gradient(180deg,#15132f 0%,#070712 100%);
+}
+
+/* nền sao */
+.stars{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+}
+
+.star{
+    position:absolute;
+    width:2px;
+    height:2px;
+    border-radius:50%;
+    background:#fff;
+    opacity:.45;
+    animation:twinkle 2.5s infinite alternate;
+}
+
+@keyframes twinkle{
+    from{opacity:.1}
+    to{opacity:.85}
+}
+
+.app{
+    position:relative;
+    width:min(900px,94vw);
+    height:100vh;
+    margin:auto;
+    display:flex;
+    flex-direction:column;
+}
+
+.header{
+    text-align:center;
+    padding:24px 0 8px;
+    flex:0 0 auto;
+}
+
+.header h1{
+    margin:0;
+    font-size:clamp(24px,4vw,32px);
+}
+
+.header p{
+    margin:6px 0 0;
+    color:#9997a8;
+    font-size:14px;
+}
+
+/*
+    YouTube chạy ngầm.
+    Không hiện video.
+*/
+#youtube-player{
+    position:fixed;
+    width:10px;
+    height:10px;
+    left:-100px;
+    top:-100px;
+    opacity:0;
+    pointer-events:none;
+}
+
+/* vùng lyrics */
+.lyrics-area{
+    position:relative;
+    flex:1;
+    min-height:0;
+}
+
+.lyrics{
+    height:100%;
+    overflow-y:auto;
+    padding:34vh 15px 45vh;
+    text-align:center;
+    scroll-behavior:smooth;
+    scrollbar-width:none;
+}
+
+.lyrics::-webkit-scrollbar{
+    display:none;
+}
+
+/*
+    TẤT CẢ LỜI TƯƠNG LAI ĐƯỢC ẨN.
+*/
+.line{
+    max-width:850px;
+    margin:0 auto;
+    padding:11px 0;
+
+    font-size:clamp(32px,5vw,52px);
+    line-height:1.35;
+    font-weight:700;
+    color:#fff;
+
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(12px) scale(.96);
+
+    transition:
+        opacity .45s ease,
+        transform .45s ease,
+        filter .3s ease;
+}
+
+/* Từng từ: kích thước hơi ngẫu nhiên nhưng ổn định */
+.word{
+    display:inline-block;
+    margin:0 .06em;
+    font-size:var(--word-size,1em);
+    transition:
+        color .22s ease,
+        transform .28s cubic-bezier(.2,.8,.2,1),
+        font-size .28s ease,
+        opacity .22s ease;
+}
+
+/* Viên thuốc: chỉ ôm đúng TỪ đang hát */
+.word.active{
+    position:relative;
+    z-index:2;
+    display:inline-block;
+    color:#fff;
+    padding:.08em .22em;
+    margin-left:-.22em;
+    margin-right:-.22em;
+    border-radius:999px;
+    background:rgba(255,255,255,.18);
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,.08) inset,
+        0 5px 25px rgba(145,125,255,.18);
+    backdrop-filter:blur(10px);
+    transform:translateY(-2px) scale(1.04);
+    animation:pillIn .28s ease both;
+}
+
+/* Không tạo thêm một viên thuốc cho cả câu */
+.line.active{
+    opacity:1;
+    transform:translateY(0);
+    filter:
+        drop-shadow(0 0 8px rgba(255,255,255,.28))
+        drop-shadow(0 0 18px rgba(145,125,255,.28));
+}
+
+.word.done{
+    color:rgba(255,255,255,.62);
+}
+
+@keyframes pillIn{
+    from{opacity:0;transform:scale(.72)}
+    to{opacity:1;transform:scale(1)}
+}
+
+/*
+    Khi đã tới thời điểm của câu:
+    câu xuất hiện.
+*/
+.line.revealed{
+    visibility:visible;
+    opacity:.48;
+    transform:translateY(0) scale(.96);
+}
+
+/*
+    Câu đang hát:
+    giống Spotify: sáng + to + nổi bật.
+*/
+
+
+/*
+    Các câu đã hát xong vẫn tồn tại phía trên,
+    nhưng mờ hơn.
+*/
+.line.past{
+    opacity:.34;
+    transform:translateY(0) scale(.96);
+}
+
+/* controls */
+.controls{
+    flex:0 0 auto;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:12px;
+    padding:10px 0 20px;
+}
+
+button{
+    border:0;
+    border-radius:999px;
+    padding:12px 24px;
+    color:#fff;
+    background:rgba(255,255,255,.12);
+    backdrop-filter:blur(12px);
+    cursor:pointer;
+    font-size:15px;
+    font-weight:700;
+}
+
+button:hover{
+    background:rgba(255,255,255,.2);
+}
+
+#clock{
+    min-width:50px;
+    color:#9997a8;
+    font-size:13px;
+}
+
+.fileBtn,.ytInput,#ytBtn{
+    border:0;
+    border-radius:999px;
+    padding:10px 14px;
+    color:#fff;
+    background:rgba(255,255,255,.10);
+    backdrop-filter:blur(12px);
+    font-size:13px;
+    font-weight:700;
+}
+.fileBtn{cursor:pointer}
+.fileBtn input{display:none}
+.ytInput{
+    width:210px;
+    outline:none;
+    border:1px solid rgba(255,255,255,.08);
+}
+.ytInput::placeholder{color:#888596}
+#ytBtn{cursor:pointer}
+@media(max-width:600px){
+    .header{padding-top:900px}
+    .lyrics{
+        padding-left:10px;
+        padding-right:10px;
+        padding-top:32vh;
+    }
+    .line{
+        font-size:21px;
+        padding:10px 0;
+    }
+    .line.active{
+        transform:scale(1.05);
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="app">
+
+    <header class="header">
+        <h1>Lưu Niện</h1>
+        <p>JACK -  J97</p>
+    </header>
+
+    <!-- YouTube chỉ làm nguồn nhạc -->
+    <div id="youtube-player"></div>
+
+    <main class="lyrics-area">
+        <div class="lyrics" id="lyrics"></div>
+    </main>
+
+    <div class="controls">
+        <button id="playBtn">▶ Phát nhạc</button>
+        <label class="fileBtn">
+            🎵 MP3
+            <input id="mp3Input" type="file" accept="audio/*">
+        </label>
+        <input id="ytInput" class="ytInput" type="url"
+               placeholder="Dán link YouTube...">
+        <button id="ytBtn">▶ YouTube</button>
+        <span id="clock">00:00</span>
+    </div>
+
+</div>
+
+<script>
+
+/* =====================================================
+   🔗 LINK YOUTUBE
+===================================================== */
+
+const YOUTUBE_URL =
+    "https://www.youtube.com/watch?v=boKJ5XDs_mY";
+
+
+/* =====================================================
+   📝 LYRICS
+
+   QUAN TRỌNG:
+   time = đúng thời điểm ca sĩ BẮT ĐẦU HÁT câu đó.
+
+   Câu chưa tới time:
+   → KHÔNG HIỆN.
+
+   Khi tới time:
+   → câu mới xuất hiện.
+
+   Sau đó:
+   → câu đang hát sáng + to.
+
+===================================================== */
+
+const LYRICS = [
+
+    { time: 0.00, text: "Intro" },
+
+    { time: 5.00, text: "Hoh-oh-oh-oh" },
+
+    { time: 8.00, text: "Hah-ah-ah-ah" },
+
+    { time: 11.00, text: "Yeah-yeah" },
+    
+    { time: 13.77, text: "🎶🎙" },
+
+    { time: 25.00, text: "Nếu có thể xin em đừng rời xa anh " },
+
+    { time: 30.00, text: "Những ký ức năm nào chẳng lành " },
+
+    { time: 35.00, text: "Nhắm ánh mắt trôi theo cả trời trong xanh " },
+
+    { time: 40.00, text: "Biết kết thúc, thôi lòng cũng đành" },
+
+    { time: 45.00, text: "Đâu cần nói, đâu cần dối đâu cần yêu trên khóe môi" },
+
+    { time: 48.00, text: "đâu cần yêu trên khóe môi" },
+
+    { time: 50.00, text: "Em đi rồi thôi, anh lẻ loi" },
+
+    { time: 52.00, text: "Từ nay em mất tôi (Mất tôi)"},
+
+    { time: 55.00, text: "Dù bầu trời này có nắng hay mưa thì anh cũng đau rồi (Đau rồi)" },
+
+    { time: 60.00, text: "Dù lần này có thắng hay thua thì anh cũng đành thôi" },
+
+    { time: 65.00, text: "Nên đôi ta phải xa nhau mãi" },
+
+    { time: 67.00, text: "Em về bên người ta và xây đắp tương lai" },
+
+    { time: 70.00, text: "Cả một đời chỉ biết yêu em nhưng giờ đây nhìn anh lắm bi hài" },
+    
+    { time: 75.00, text: "Đôi chân anh rụng rơi như lá" },
+
+    { time: 77.00, text: "Mai này đây nhìn em lộng lẫy áo thêu hoa" },
+
+    { time: 80.00, text: "Một nụ cười cứ thế chia xa, xin đừng yêu" },
+
+    { time: 82.60, text: "Đừng thương xót anh mà, baby" },
+
+    { time: 85.00, text: "hah-ah" },
+
+    { time: 90.00, text: "Uh, yêu nhau bao lâu, hôm nay xa nhau, con tim ai khâu?" },
+
+    { time: 95.00, text: "Sao anh không đau? Khóe mi này lau, bước đi thật mau" },
+
+    { time: 100.00, text: "Trái ngang làm sao, nói ra làm sao, nhớ nhau thì sao?" },
+
+    { time: 105.00, text: "Này, yeah-yeah" },
+
+    { time: 408.00, text: "Đôi khi anh muốn tâm tư anh thôi tin em rồi chờ mong" },
+
+    { time: 430.00, text: "Đêm khuya thanh vắng, cô đơn bên trong tim anh còn giờ không?" },
+
+    { time: 453.00, text: "Sao em không nói sau bao lâu xa nhau chẳng chờ trông?" },
+
+    { time: 475.00, text: "Tình yêu trao em có chết vẫn đau lòng" },
+
+    { time: 498.00, text: "Đâu cần nói (Oh), đâu cần dối (Oh), đâu cần yêu trên khóe môi (Khóe môi)" },
+    
+    { time: 520.00, text: "Em đi rồi thôi, anh lẻ loi, từ nay em mất tôi (Mất tôi)" },
+
+    { time: 543.00, text: "Dù bầu trời này có nắng hay mưa thì anh cũng đau rồi (Đau rồi)" },
+
+    { time: 565.00, text: "Dù lần này có thắng hay thua thì anh cũng đành thôi (Anh cũng đành thôi)" },
+
+    { time: 588.00, text: "Nên đôi ta phải xa nhau mãi, em về bên người ta và xây đắp tương lai" },
+
+    { time: 610.00, text: "Cả một đời chỉ biết yêu em nhưng giờ đây nhìn anh lắm bi hài" },
+
+    { time: 633.00, text: "Đôi chân anh rụng rơi như lá, mai này đây nhìn em lộng lẫy áo thêu hoa" },
+
+    { time: 655.00, text: "Một nụ cười cứ thế chia xa, xin đừng yêu, đừng thương xót anh mà, baby," },
+
+    { time: 678.00, text: "hah-ah" }, 
+
+    { time: 700.00, text: "Yeah-yeah" },
+
+    { time: 723.00, text: "Yeah-yeah" },
+
+    { time: 745.00, text: "Yeah-yeah" },
+
+    { time: 768.00, text: "Yeah-yeah" },
+
+    { time: 790.00, text: "Yeah-yeah" },
+
+    { time: 813.00, text: "Yeah-yeah" },
+
+    { time: 835.00, text: "Yeah-yeah" },
+
+    { time: 858.00, text: "Yeah-yeah" }
+
+    
+];
+
+
+/* =====================================================
+   🎚️ OFFSET
+
+   +1 = lyrics hiện MUỘN 1 giây
+   -1 = lyrics hiện SỚM 1 giây
+===================================================== */
+
+const LYRICS_OFFSET = 0;
+
+
+/* =====================================================
+   YOUTUBE ID
+===================================================== */
+
+function getYoutubeID(url){
+
+    try{
+
+        const u = new URL(url);
+
+        if(u.hostname.includes("youtu.be")){
+            return u.pathname.substring(1);
+        }
+
+        if(u.hostname.includes("youtube.com")){
+            return u.searchParams.get("v");
+        }
+
+    }catch(e){
+        console.error("Link YouTube không hợp lệ",e);
+    }
+
+    return null;
+}
+
+const VIDEO_ID = getYoutubeID(YOUTUBE_URL);
+
+
+/* =====================================================
+   HIỂN THỊ LYRICS
+===================================================== */
+
+const lyricsBox =
+    document.getElementById("lyrics");
+
+LYRICS.forEach((item,index)=>{
+
+    const el =
+        document.createElement("div");
+
+    el.className = "line";
+    el.dataset.index = index;
+
+    // Tách từng từ để có pill + kích thước chữ riêng
+    const words = item.text.split(/(\\s+)/);
+    words.forEach((part) => {
+        if (/^\\s+$/.test(part)) {
+            el.appendChild(document.createTextNode(part));
+            return;
+        }
+        const w = document.createElement("span");
+        w.className = "word";
+        w.textContent = part;
+
+        // Random nhẹ nhưng giữ nguyên sau mỗi lần render
+        const size = (0.86 + Math.random() * 0.28).toFixed(2);
+        w.style.setProperty("--word-size", size + "em");
+        el.appendChild(w);
+    });
+
+    lyricsBox.appendChild(el);
+
+});
+
+const lyricEls =
+    [...document.querySelectorAll(".line")];
+
+
+/* =====================================================
+   YOUTUBE API
+===================================================== */
+
+let player = null;
+let ready = false;
+let syncTimer = null;
+let currentIndex = -1;
+
+const script =
+    document.createElement("script");
+
+script.src =
+    "https://www.youtube.com/iframe_api";
+
+document.head.appendChild(script);
+
+window.onYouTubeIframeAPIReady = function(){
+
+    player =
+        new YT.Player("youtube-player",{
+
+            videoId:VIDEO_ID,
+
+            playerVars:{
+                autoplay:0,
+                controls:0,
+                rel:0,
+                playsinline:1,
+                modestbranding:1,
+                enablejsapi:1,
+                origin:window.location.origin
+            },
+
+            events:{
+
+                onReady:function(){
+
+                    ready = true;
+
+                    updateLyrics();
+
+                },
+
+                onStateChange:function(event){
+
+                    if(
+                        event.data ===
+                        YT.PlayerState.PLAYING
+                    ){
+
+                        document.getElementById(
+                            "playBtn"
+                        ).textContent =
+                            "⏸ Tạm dừng";
+
+                        startSync();
+
+                    }
+
+                    else if(
+                        event.data ===
+                        YT.PlayerState.PAUSED
+                    ){
+
+                        document.getElementById(
+                            "playBtn"
+                        ).textContent =
+                            "▶ Tiếp tục";
+
+                        stopSync();
+
+                        updateLyrics();
+
+                    }
+
+                    else if(
+                        event.data ===
+                        YT.PlayerState.ENDED
+                    ){
+
+                        document.getElementById(
+                            "playBtn"
+                        ).textContent =
+                            "▶ Phát lại";
+
+                        stopSync();
+
+                    }
+
+                }
+
+            }
+
+        });
+
+};
+
+
+/* =====================================================
+   NÚT PHÁT
+===================================================== */
+
+document.getElementById("playBtn")
+.addEventListener("click",function(){
+
+    if(usingMP3){
+        if(!audioElement) return;
+        if(audioElement.paused) audioElement.play();
+        else audioElement.pause();
+        return;
+    }
+
+    if(!ready) return;
+
+    const state =
+        player.getPlayerState();
+
+    if(
+        state ===
+        YT.PlayerState.PLAYING
+    ){
+
+        player.pauseVideo();
+
+    }else{
+
+        player.playVideo();
+
+    }
+
+});
+
+
+/* =====================================================
+   ĐỒNG BỘ
+===================================================== */
+
+function startSync(){
+
+    stopSync();
+
+    syncTimer =
+        setInterval(
+            updateLyrics,
+            50
+        );
+
+}
+
+function stopSync(){
+
+    if(syncTimer){
+
+        clearInterval(syncTimer);
+
+        syncTimer = null;
+
+    }
+
+}
+
+
+function updateLyrics(){
+
+    if(
+        (usingMP3 && !audioElement) ||
+        (!usingMP3 && (!ready || !player || typeof player.getCurrentTime !== "function"))
+    ) return;
+
+    const songTime =
+        usingMP3 && audioElement
+            ? audioElement.currentTime
+            : player.getCurrentTime();
+
+    /*
+       Áp dụng offset.
+    */
+    const lyricTime =
+        songTime - LYRICS_OFFSET;
+
+    document.getElementById("clock")
+        .textContent =
+        formatTime(songTime);
+
+
+    /*
+       Tìm câu hiện tại.
+    */
+    let index = -1;
+
+    for(
+        let i=0;
+        i<LYRICS.length;
+        i++
+    ){
+
+        if(
+            lyricTime >=
+            LYRICS[i].time
+        ){
+
+            index = i;
+
+        }else{
+
+            break;
+
+        }
+
+    }
+
+
+    /*
+       Nếu chưa đổi câu,
+       vẫn kiểm tra reveal nhưng không
+       scroll lại liên tục.
+    */
+
+    const changed =
+        index !== currentIndex;
+
+    currentIndex = index;
+
+
+    /*
+       ⭐ ĐÂY LÀ PHẦN QUAN TRỌNG:
+
+       Chỉ câu nào đã tới thời gian
+       mới được hiện ra.
+    */
+
+    lyricEls.forEach((el,i)=>{
+        el.classList.remove("revealed","active","past");
+
+        const start = LYRICS[i].time;
+        const end = i < LYRICS.length - 1
+            ? LYRICS[i + 1].time
+            : start + 5;
+
+        if(i <= index) el.classList.add("revealed");
+        if(i < index) el.classList.add("past");
+        if(i === index) el.classList.add("active");
+
+        // Highlight từng từ theo tiến độ của câu.
+        // Nếu chưa có timestamp từng từ, chia đều thời lượng câu.
+        const ws = [...el.querySelectorAll(".word")];
+        const duration = Math.max(.4, end - start);
+
+        ws.forEach((w, wi)=>{
+            const a = start + duration * wi / Math.max(1,ws.length);
+            const b = start + duration * (wi + 1) / Math.max(1,ws.length);
+
+            w.classList.remove("active","done");
+            if(lyricTime >= b) w.classList.add("done");
+            else if(lyricTime >= a && lyricTime < b) w.classList.add("active");
+        });
+    });
+
+
+    /*
+       Câu mới vừa bắt đầu hát:
+       cuộn nó vào giữa màn hình.
+    */
+
+    if(
+        changed &&
+        index >= 0
+    ){
+
+        lyricEls[index]
+            .scrollIntoView({
+                behavior:"smooth",
+                block:"center"
+            });
+
+    }
+
+}
+
+
+/* =====================================================
+   🎵 MP3 + YouTube
+===================================================== */
+
+let audioElement = null;
+let usingMP3 = false;
+
+document.getElementById("mp3Input").addEventListener("change", function(){
+    const file = this.files[0];
+    if(!file) return;
+
+    if(audioElement) {
+        audioElement.pause();
+        URL.revokeObjectURL(audioElement.src);
+    }
+
+    audioElement = new Audio(URL.createObjectURL(file));
+    usingMP3 = true;
+
+    // Dừng YouTube nếu đang phát
+    if(player && ready) player.pauseVideo();
+
+    audioElement.addEventListener("loadedmetadata", updateLyrics);
+    audioElement.addEventListener("play", ()=>{
+        document.getElementById("playBtn").textContent="⏸ Tạm dừng";
+        startMP3Sync();
+    });
+    audioElement.addEventListener("pause", ()=>{
+        document.getElementById("playBtn").textContent="▶ Tiếp tục";
+        stopMP3Sync();
+        updateLyrics();
+    });
+
+    document.querySelector(".header h1").textContent =
+        file.name.replace(/\\.[^/.]+$/,"");
+    document.querySelector(".header p").textContent =
+        "MP3 của bạn";
+
+    audioElement.play();
+});
+
+let mp3Timer = null;
+function startMP3Sync(){
+    clearInterval(mp3Timer);
+    mp3Timer = setInterval(updateLyrics,50);
+}
+function stopMP3Sync(){
+    clearInterval(mp3Timer);
+    mp3Timer = null;
+}
+
+document.getElementById("ytBtn").addEventListener("click", ()=>{
+    const url = document.getElementById("ytInput").value.trim();
+    const id = getYoutubeID(url);
+    if(!id || !player || !ready){
+        alert("Link YouTube chưa hợp lệ hoặc YouTube chưa sẵn sàng.");
+        return;
+    }
+
+    usingMP3 = false;
+    if(audioElement) audioElement.pause();
+
+    player.loadVideoById(id);
+    document.querySelector(".header h1").textContent = "YouTube";
+    document.querySelector(".header p").textContent = url;
+});
+
+/* =====================================================
+   FORMAT TIME
+===================================================== */
+
+function formatTime(seconds){
+
+    if(!Number.isFinite(seconds))
+        return "00:00";
+
+    const m =
+        Math.floor(seconds/60);
+
+    const s =
+        Math.floor(seconds%60);
+
+    return String(m).padStart(2,"0")
+        + ":" +
+        String(s).padStart(2,"0");
+
+}
+
+
+/* =====================================================
+   SAO
+===================================================== */
+
+const stars =
+    document.getElementById("stars");
+
+for(let i=0;i<110;i++){
+
+    const star =
+        document.createElement("span");
+
+    star.className = "star";
+
+    star.style.left =
+        Math.random()*100+"%";
+
+    star.style.top =
+        Math.random()*100+"%";
+
+    star.style.animationDelay =
+        Math.random()*2.5+"s";
+
+    stars.appendChild(star);
+
+}
+
+</script>
+
+</body>
+</html>
